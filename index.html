@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>推箱子小游戏</title>
+  <style>
+    :root {
+      --bg: #111827;
+      --panel: #1f2937;
+      --grid: #374151;
+      --wall: #6b7280;
+      --floor: #e5e7eb;
+      --target: #f59e0b;
+      --box: #8b5a2b;
+      --box-on-target: #22c55e;
+      --player: #3b82f6;
+      --text: #f9fafb;
+      --sub: #cbd5e1;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: linear-gradient(135deg, #0f172a, #111827);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .app {
+      width: min(92vw, 760px);
+      background: rgba(31, 41, 55, 0.92);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 20px;
+      padding: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+      backdrop-filter: blur(10px);
+    }
+
+    .topbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 28px;
+    }
+
+    .meta {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      background: #111827;
+      border: 1px solid rgba(255,255,255,0.08);
+      color: var(--sub);
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-size: 14px;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    button {
+      border: none;
+      border-radius: 12px;
+      padding: 10px 14px;
+      background: #2563eb;
+      color: white;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: transform .08s ease, opacity .2s ease, background .2s ease;
+    }
+
+    button:hover { opacity: .92; }
+    button:active { transform: scale(0.98); }
+
+    button.secondary {
+      background: #475569;
+    }
+
+    .hint {
+      color: var(--sub);
+      font-size: 14px;
+      margin-bottom: 16px;
+      line-height: 1.6;
+    }
+
+    .board-wrap {
+      display: flex;
+      justify-content: center;
+      overflow: auto;
+      background: rgba(17, 24, 39, 0.7);
+      border-radius: 16px;
+      padding: 14px;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .board {
+      display: grid;
+      gap: 2px;
+      background: var(--grid);
+      padding: 2px;
+      border-radius: 12px;
+      user-select: none;
+      touch-action: none;
+    }
+
+    .cell {
+      width: 44px;
+      height: 44px;
+      border-radius: 8px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .floor { background: var(--floor); }
+    .wall { background: var(--wall); }
+    .target {
+      background: var(--floor);
+    }
+    .target::after {
+      content: "";
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--target);
+      opacity: .9;
+    }
+
+    .box {
+      background: var(--floor);
+    }
+    .box::before {
+      content: "";
+      width: 26px;
+      height: 26px;
+      border-radius: 6px;
+      background: var(--box);
+      box-shadow: inset 0 0 0 2px rgba(255,255,255,0.15);
+    }
+
+    .box.target::before {
+      background: var(--box-on-target);
+    }
+
+    .player {
+      background: var(--floor);
+    }
+    .player::before {
+      content: "";
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--player);
+      box-shadow: 0 0 0 3px rgba(255,255,255,0.35) inset;
+    }
+
+    .player.target::after {
+      content: "";
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--target);
+      z-index: 0;
+      opacity: .55;
+    }
+
+    .msg {
+      margin-top: 16px;
+      min-height: 26px;
+      font-weight: 700;
+      color: #86efac;
+    }
+
+    .footer {
+      margin-top: 14px;
+      color: var(--sub);
+      font-size: 13px;
+    }
+
+    @media (max-width: 640px) {
+      .cell {
+        width: 34px;
+        height: 34px;
+      }
+      .box::before {
+        width: 20px;
+        height: 20px;
+      }
+      .player::before {
+        width: 18px;
+        height: 18px;
+      }
+      .target::after,
+      .player.target::after {
+        width: 10px;
+        height: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="topbar">
+      <h1>推箱子小游戏</h1>
+      <div class="meta">
+        <div class="badge">关卡：<span id="level">1</span></div>
+        <div class="badge">步数：<span id="steps">0</span></div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button id="restartBtn">重新开始</button>
+      <button id="prevBtn" class="secondary">上一关</button>
+      <button id="nextBtn" class="secondary">下一关</button>
+    </div>
+
+    <div class="hint">
+      操作方式：键盘 <b>↑ ↓ ← →</b> 或 <b>W A S D</b>。<br>
+      目标：把所有箱子推到黄色目标点上。
+    </div>
+
+    <div class="board-wrap">
+      <div id="board" class="board"></div>
+    </div>
+
+    <div id="message" class="msg"></div>
+    <div class="footer">提示：刷新页面会重置进度。</div>
+  </div>
+
+  <script>
+    const levels = [
+      [
+        "########",
+        "#......#",
+        "#..T...#",
+        "#..B...#",
+        "#..P...#",
+        "#......#",
+        "########"
+      ],
+      [
+        "##########",
+        "#........#",
+        "#..T.....#",
+        "#..B.....#",
+        "#..B.T...#",
+        "#....P...#",
+        "#........#",
+        "##########"
+      ],
+      [
+        "##########",
+        "#........#",
+        "#..T.T...#",
+        "#..B.B...#",
+        "#....P...#",
+        "#........#",
+        "##########"
+      ]
+    ];
+
+    const CELL = {
+      WALL: "#",
+      FLOOR: ".",
+      TARGET: "T",
+      BOX: "B",
+      PLAYER: "P"
+    };
+
+    let currentLevel = 0;
+    let steps = 0;
+    let baseMap = [];
+    let player = { x: 0, y: 0 };
+    let boxes = [];
+
+    const boardEl = document.getElementById("board");
+    const stepsEl = document.getElementById("steps");
+    const levelEl = document.getElementById("level");
+    const messageEl = document.getElementById("message");
+
+    function loadLevel(index) {
+      currentLevel = (index + levels.length) % levels.length;
+      steps = 0;
+      messageEl.textContent = "";
+      const raw = levels[currentLevel].map(row => row.split(""));
+      baseMap = raw.map(row => row.map(cell => {
+        if (cell === CELL.PLAYER) return CELL.FLOOR;
+        if (cell === CELL.BOX) return CELL.FLOOR;
+        return cell;
+      }));
+
+      boxes = [];
+      for (let y = 0; y < raw.length; y++) {
+        for (let x = 0; x < raw[y].length; x++) {
+          if (raw[y][x] === CELL.PLAYER) {
+            player = { x, y };
+          } else if (raw[y][x] === CELL.BOX) {
+            boxes.push({ x, y });
+          }
+        }
+      }
+      render();
+    }
+
+    function isWall(x, y) {
+      return !baseMap[y] || !baseMap[y][x] || baseMap[y][x] === CELL.WALL;
+    }
+
+    function isTarget(x, y) {
+      return baseMap[y] && baseMap[y][x] === CELL.TARGET;
+    }
+
+    function getBoxIndex(x, y) {
+      return boxes.findIndex(b => b.x === x && b.y === y);
+    }
+
+    function isBox(x, y) {
+      return getBoxIndex(x, y) !== -1;
+    }
+
+    function move(dx, dy) {
+      const nx = player.x + dx;
+      const ny = player.y + dy;
+
+      if (isWall(nx, ny)) return;
+
+      const boxIndex = getBoxIndex(nx, ny);
+      if (boxIndex !== -1) {
+        const bx = nx + dx;
+        const by = ny + dy;
+        if (isWall(bx, by) || isBox(bx, by)) return;
+        boxes[boxIndex] = { x: bx, y: by };
+      }
+
+      player = { x: nx, y: ny };
+      steps++;
+      render();
+
+      if (checkWin()) {
+        messageEl.textContent = `恭喜通关！你用了 ${steps} 步。`;
+      }
+    }
+
+    function checkWin() {
+      return boxes.every(box => isTarget(box.x, box.y));
+    }
+
+    function render() {
+      const rows = baseMap.length;
+      const cols = Math.max(...baseMap.map(r => r.length));
+      boardEl.style.gridTemplateColumns = `repeat(${cols}, 44px)`;
+
+      if (window.innerWidth <= 640) {
+        boardEl.style.gridTemplateColumns = `repeat(${cols}, 34px)`;
+      }
+
+      boardEl.innerHTML = "";
+
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const cell = document.createElement("div");
+          cell.classList.add("cell");
+
+          if (isWall(x, y)) {
+            cell.classList.add("wall");
+          } else {
+            const target = isTarget(x, y);
+            const hasBox = isBox(x, y);
+            const isPlayerHere = player.x === x && player.y === y;
+
+            if (isPlayerHere) {
+              cell.classList.add("player");
+              if (target) cell.classList.add("target");
+            } else if (hasBox) {
+              cell.classList.add("box");
+              if (target) cell.classList.add("target");
+            } else if (target) {
+              cell.classList.add("target");
+            } else {
+              cell.classList.add("floor");
+            }
+          }
+
+          boardEl.appendChild(cell);
+        }
+      }
+
+      stepsEl.textContent = steps;
+      levelEl.textContent = currentLevel + 1;
+    }
+
+    document.addEventListener("keydown", (e) => {
+      const key = e.key.toLowerCase();
+      if (checkWin() && ["arrowup","arrowdown","arrowleft","arrowright","w","a","s","d"].includes(key)) {
+        return;
+      }
+
+      if (key === "arrowup" || key === "w") move(0, -1);
+      else if (key === "arrowdown" || key === "s") move(0, 1);
+      else if (key === "arrowleft" || key === "a") move(-1, 0);
+      else if (key === "arrowright" || key === "d") move(1, 0);
+    });
+
+    document.getElementById("restartBtn").addEventListener("click", () => loadLevel(currentLevel));
+    document.getElementById("prevBtn").addEventListener("click", () => loadLevel(currentLevel - 1));
+    document.getElementById("nextBtn").addEventListener("click", () => loadLevel(currentLevel + 1));
+
+    loadLevel(0);
+  </script>
+</body>
+</html>
